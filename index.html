@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashcrop Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3oD+sCoJrzXJ+yKqtkPsqIQRbqDTliIK0GT3PFWFuQEMhUzM0qRqA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    :root {
+      --green: #2B7A42;
+      --green-light: #e8f5ec;
+      --green-dark: #1f5c31;
+      --bg: #F7F8F5;
+      --surface: #FFFFFF;
+      --border: #E2DDD6;
+      --text: #1A1916;
+      --text2: #6B6860;
+      --red: #d9534f;
+      --amber: #e6a817;
+      --shadow: 0 1px 4px rgba(0,0,0,.08);
+      --radius: 10px;
+      --font: 'DM Sans', system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #111210;
+        --surface: #1c1e1a;
+        --border: #2f3129;
+        --text: #f0f0ec;
+        --text2: #9b9890;
+        --green-light: #1a3020;
+        --shadow: 0 1px 4px rgba(0,0,0,.4);
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #111210;
+      --surface: #1c1e1a;
+      --border: #2f3129;
+      --text: #f0f0ec;
+      --text2: #9b9890;
+      --green-light: #1a3020;
+      --shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-weight: 700; font-size: 17px; color: var(--green); letter-spacing: -.3px; }
+    .logo span { color: var(--text); font-weight: 400; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .status-dot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text2);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+    .dot.green { background: #34c759; }
+    .dot.amber { background: var(--amber); }
+    .refresh-btn {
+      background: none; border: 1px solid var(--border);
+      color: var(--text2); border-radius: 6px; padding: 4px 10px;
+      font-size: 12px; cursor: pointer; font-family: var(--font);
+    }
+    .refresh-btn:hover { background: var(--bg); }
+
+    /* ── Stale banner ── */
+    #stale-banner {
+      display: none;
+      background: #fff8e1; color: #856404; border-bottom: 1px solid #ffe082;
+      padding: 8px 16px; font-size: 13px; text-align: center;
+    }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #stale-banner { background: #2a2200; color: #ffd54f; border-color: #4a3800; } }
+
+    /* ── Tabs ── */
+    .tabs-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; overflow-x: auto; padding: 0 16px;
+      scrollbar-width: none;
+    }
+    .tabs-bar::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font); font-size: 14px; font-weight: 500;
+      color: var(--text2); padding: 14px 16px; white-space: nowrap;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── Main content ── */
+    main { padding: 20px 16px; max-width: 1200px; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Cards / tiles ── */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .tile {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+    }
+    .tile-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .tile-value { font-size: 24px; font-weight: 700; }
+    .tile-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+    .tile.red .tile-value { color: var(--red); }
+    .tile.amber .tile-value { color: var(--amber); }
+    .tile.green .tile-value { color: var(--green); }
+    .tile-indicator { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+    /* ── Section cards ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 16px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+    .charts-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { text-align: left; padding: 8px 10px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; }
+    tbody td { padding: 10px 10px; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--bg); }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block; border-radius: 4px; padding: 2px 7px;
+      font-size: 11px; font-weight: 600; letter-spacing: .3px;
+    }
+    .badge.red { background: #fde8e8; color: var(--red); }
+    .badge.amber { background: #fff3cd; color: #856404; }
+    .badge.green { background: #e8f5ec; color: var(--green); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge.red { background: #3a1010; color: #f87171; }
+      :root:not([data-theme="light"]) .badge.amber { background: #2a1e00; color: #fcd34d; }
+      :root:not([data-theme="light"]) .badge.green { background: #0d2318; color: #4ade80; } }
+
+    /* ── Alerts panel ── */
+    .alerts { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      border-left: 3px solid; padding: 10px 12px; border-radius: 0 6px 6px 0;
+      font-size: 13px; background: var(--bg);
+    }
+    .alert-item.red { border-color: var(--red); }
+    .alert-item.amber { border-color: var(--amber); }
+
+    /* ── Progress bar ── */
+    .progress-bar { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px; }
+    .progress-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width .4s; }
+    .progress-fill.amber { background: var(--amber); }
+    .progress-fill.red { background: var(--red); }
+
+    /* ── Loading / error ── */
+    #loading-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.25);
+      display: flex; align-items: center; justify-content: center; z-index: 999;
+    }
+    .spinner {
+      width: 40px; height: 40px; border: 4px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error-box {
+      display: none;
+      background: #fde8e8; border: 1px solid #f5c6cb; border-radius: var(--radius);
+      padding: 16px; margin: 16px; color: var(--red); font-size: 14px;
+    }
+    .error-card {
+      background: #fde8e8; border: 1px solid #f5c6cb; border-radius: var(--radius);
+      padding: 14px; color: var(--red); font-size: 13px; margin-bottom: 12px;
+    }
+
+    /* ── Editable input ── */
+    .editable-input {
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 3px 6px; font-family: var(--font); font-size: 13px;
+      background: var(--bg); color: var(--text); width: 80px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .tiles { grid-template-columns: 1fr 1fr; }
+      .charts-row { grid-template-columns: 1fr; }
+      .tile-value { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spinner"></div></div>
+<div id="stale-banner">⚠ Data is more than 2 hours old — may be stale.</div>
+<div id="error-box"></div>
+
+<header>
+  <div class="logo">Dashcrop <span>Limited</span></div>
+  <div class="header-right">
+    <div class="status-dot">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Loading…</span>
+    </div>
+    <button class="refresh-btn" onclick="fetchData(true)">↻ Refresh</button>
+  </div>
+</header>
+
+<nav class="tabs-bar" role="tablist">
+  <button class="tab-btn active" role="tab" onclick="switchTab(0)">Overview</button>
+  <button class="tab-btn" role="tab" onclick="switchTab(1)">Direct Sales</button>
+  <button class="tab-btn" role="tab" onclick="switchTab(2)">Commercial / Margins</button>
+  <button class="tab-btn" role="tab" onclick="switchTab(3)">Farmer Procurement</button>
+  <button class="tab-btn" role="tab" onclick="switchTab(4)">Stock</button>
+  <button class="tab-btn" role="tab" onclick="switchTab(5)">Procurement</button>
+</nav>
+
+<!-- TAB 0: Overview -->
+<main>
+  <div class="tab-panel active" id="tab-0">
+    <div class="tiles" id="overview-tiles"></div>
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-title">Net P&amp;L YTD</div>
+        <div class="chart-wrap"><canvas id="pnl-chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top Stock Warnings</div>
+        <div class="alerts" id="stock-alerts"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 1: Direct Sales -->
+  <div class="tab-panel" id="tab-1">
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-title">Revenue by Customer (Top 5)</div>
+        <div class="chart-wrap"><canvas id="customer-donut"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Revenue by Month (Last 3)</div>
+        <div class="chart-wrap"><canvas id="revenue-bar"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Open Sales Orders</div>
+      <div class="table-wrap" id="sales-orders-table"></div>
+    </div>
+    <div class="tiles" id="sales-summary-tiles"></div>
+  </div>
+
+  <!-- TAB 2: Commercial / Margins -->
+  <div class="tab-panel" id="tab-2">
+    <div class="card">
+      <div class="card-title">Margin per Product</div>
+      <div style="position:relative;height:260px"><canvas id="margin-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Product Margin Table</div>
+      <div class="table-wrap" id="margin-table"></div>
+    </div>
+    <div id="below-cost-alert"></div>
+  </div>
+
+  <!-- TAB 3: Farmer Procurement -->
+  <div class="tab-panel" id="tab-3">
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-title">Procurement by Supplier Group</div>
+        <div class="chart-wrap"><canvas id="supplier-bar"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Outstanding Farmer Payments</div>
+        <div class="table-wrap" id="farmer-payables-table"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Last Month Procurement Breakdown</div>
+      <div class="table-wrap" id="procurement-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Unit Cost Tracker (Ksh/kg by Raw Material)</div>
+      <div class="chart-wrap"><canvas id="cost-tracker-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TAB 4: Stock -->
+  <div class="tab-panel" id="tab-4">
+    <div class="card">
+      <div class="card-title">Finished Goods — Stock Health</div>
+      <div class="table-wrap" id="stock-health-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Raw Materials</div>
+      <div class="table-wrap" id="raw-materials-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Production Runway (batches from current stock)</div>
+      <div id="production-runway"></div>
+    </div>
+  </div>
+
+  <!-- TAB 5: Procurement -->
+  <div class="tab-panel" id="tab-5">
+    <div class="card">
+      <div class="card-title">Raw Material Coverage</div>
+      <div class="table-wrap" id="rm-coverage-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Incoming Purchase Orders</div>
+      <div class="table-wrap" id="incoming-pos-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Purchase History (Last 3 PO Prices per Ingredient)</div>
+      <div class="table-wrap" id="purchase-history-table"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIGURATION
+// ─────────────────────────────────────────────
+const SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_URL_HERE';
+const CACHE_KEY  = 'dashcrop_payload_v1';
+const CACHE_TTL  = 30 * 60 * 1000; // 30 minutes
+const STALE_AGE  = 2  * 60 * 60 * 1000; // 2 hours
+
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+function ksh(n) {
+  if (n == null || isNaN(n)) return 'Ksh —';
+  return 'Ksh ' + Number(n).toLocaleString('en-KE', { maximumFractionDigits: 0 });
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch { return iso; }
+}
+function daysSince(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso)) / 86400000);
+}
+function badge(status) {
+  const cls = status === 'critical' ? 'red' : status === 'low' ? 'amber' : 'green';
+  const label = { critical: 'Critical', low: 'Low', ok: 'OK', draft: 'Draft', open: 'Open', done: 'Done' }[status] || status;
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function daysRunout(onHand, monthlyUsage) {
+  if (!monthlyUsage || monthlyUsage === 0) return '∞';
+  const days = Math.round(onHand / (monthlyUsage / 30));
+  return days + 'd';
+}
+
+// ─────────────────────────────────────────────
+//  CHART REGISTRY — destroy before redraw
+// ─────────────────────────────────────────────
+const _charts = {};
+function getChart(id, type, data, options) {
+  if (_charts[id]) { try { _charts[id].destroy(); } catch {} }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  _charts[id] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, ...(options||{}) } });
+  return _charts[id];
+}
+
+// chart color palette
+const COLORS = ['#2B7A42','#4caf7d','#e6a817','#d9534f','#5b8cf5','#9b59b6','#e67e22','#1abc9c'];
+
+// ─────────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────────
+let activeTab = 0;
+function switchTab(n) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === n));
+  document.querySelectorAll('.tab-panel').forEach((p, i) => p.classList.toggle('active', i === n));
+  activeTab = n;
+}
+
+// ─────────────────────────────────────────────
+//  DATA FETCHING
+// ─────────────────────────────────────────────
+let _payload = null;
+
+function getCached() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.ts > CACHE_TTL) return null;
+    return parsed;
+  } catch { return null; }
+}
+function setCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
+async function fetchData(force = false) {
+  document.getElementById('loading-overlay').style.display = force ? 'flex' : _payload ? 'none' : 'flex';
+  document.getElementById('error-box').style.display = 'none';
+
+  // Check cache
+  if (!force) {
+    const cached = getCached();
+    if (cached) {
+      _payload = cached.data;
+      setStatus('cached', cached.ts);
+      renderAll(_payload);
+      document.getElementById('loading-overlay').style.display = 'none';
+      return;
+    }
+  }
+
+  // Live fetch
+  try {
+    const url = SCRIPT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE'
+      ? null  // use demo data
+      : SCRIPT_URL + '?data=1' + (force ? '&refresh=1' : '');
+
+    let data;
+    if (!url) {
+      data = getDemoPayload();
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      data = await res.json();
+    }
+    _payload = data;
+    setCache(data);
+    setStatus('live', Date.now());
+    renderAll(data);
+  } catch (e) {
+    // try stale cache
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        _payload = parsed.data;
+        setStatus('cached', parsed.ts);
+        renderAll(parsed.data);
+        return;
+      }
+    } catch {}
+    document.getElementById('error-box').style.display = 'block';
+    document.getElementById('error-box').textContent = '⚠ Could not load data: ' + e.message;
+    setStatus('error');
+  } finally {
+    document.getElementById('loading-overlay').style.display = 'none';
+  }
+}
+
+function setStatus(state, ts) {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  if (state === 'live') {
+    dot.className = 'dot green';
+    text.textContent = '● Live from Odoo';
+  } else if (state === 'cached') {
+    dot.className = 'dot amber';
+    const age = Math.round((Date.now() - ts) / 60000);
+    text.textContent = `⚠ Cached (${age} min ago)`;
+    document.getElementById('stale-banner').style.display =
+      (Date.now() - ts > STALE_AGE) ? 'block' : 'none';
+  } else {
+    dot.className = 'dot';
+    text.textContent = 'Offline';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  RENDER ALL
+// ─────────────────────────────────────────────
+function renderAll(p) {
+  try { renderOverview(p); } catch(e) { showTabError('tab-0', e); }
+  try { renderSales(p); }    catch(e) { showTabError('tab-1', e); }
+  try { renderMargins(p); }  catch(e) { showTabError('tab-2', e); }
+  try { renderFarmer(p); }   catch(e) { showTabError('tab-3', e); }
+  try { renderStock(p); }    catch(e) { showTabError('tab-4', e); }
+  try { renderProcure(p); }  catch(e) { showTabError('tab-5', e); }
+}
+
+function showTabError(tabId, err) {
+  const el = document.getElementById(tabId);
+  if (!el) return;
+  el.insertAdjacentHTML('afterbegin',
+    `<div class="error-card">⚠ Render error: ${err.message}</div>`);
+}
+
+// ─────────────────────────────────────────────
+//  TAB 0 — OVERVIEW
+// ─────────────────────────────────────────────
+function renderOverview(p) {
+  const cash = p.cashBalance || 0;
+  const cashClass = cash < 0 ? 'red' : cash < 500000 ? 'amber' : 'green';
+
+  // KOMEX receivable (largest single)
+  const rxs = p.receivables || [];
+  const komexRx = [...rxs].sort((a,b) => (b.amount||0) - (a.amount||0))[0] || {};
+  const komexDays = daysSince(komexRx.invoiceDate);
+
+  // Payables to farmers
+  const pays = (p.payables || []).filter(x => ['farmer','supplier'].includes((x.partnerCategory||'').toLowerCase()));
+  const farmerPayable = pays.reduce((s, x) => s + (x.amount || 0), 0);
+
+  // Monthly sales
+  const ms = p.monthlySales || [];
+  const ytdRev  = ms.reduce((s,m) => s + (m.revenue || 0), 0);
+  const ytdCogs = ms.reduce((s,m) => s + (m.cogs || 0), 0);
+  const ytdPnl  = ytdRev - ytdCogs;
+
+  // Runway
+  const weeklyBurn = (ytdCogs / Math.max(ms.length, 1)) / 4;
+  const expectedColl = rxs.reduce((s,r) => {
+    const d = daysSince(r.invoiceDate);
+    return s + (d !== null && d <= 30 ? (r.amount || 0) : 0);
+  }, 0);
+  const runway = weeklyBurn > 0 ? Math.round((cash + expectedColl) / weeklyBurn) : '∞';
+
+  const tiles = document.getElementById('overview-tiles');
+  tiles.innerHTML = `
+    <div class="tile ${cashClass}">
+      <div class="tile-label">Cash Balance</div>
+      <div class="tile-value">${ksh(cash)}</div>
+      <div class="tile-sub">${cashClass === 'red' ? '🔴 Negative' : cashClass === 'amber' ? '⚠ Low' : '✓ Healthy'}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Largest Receivable</div>
+      <div class="tile-value" style="font-size:18px">${ksh(komexRx.amount)}</div>
+      <div class="tile-sub">${komexRx.partnerName || 'N/A'} · ${komexDays != null ? komexDays + 'd ago' : '—'}</div>
+    </div>
+    <div class="tile amber">
+      <div class="tile-label">Farmer Payables</div>
+      <div class="tile-value" style="font-size:18px">${ksh(farmerPayable)}</div>
+      <div class="tile-sub">${pays.length} outstanding</div>
+    </div>
+    <div class="tile ${ytdPnl >= 0 ? 'green' : 'red'}">
+      <div class="tile-label">Net P&amp;L YTD</div>
+      <div class="tile-value" style="font-size:18px">${ksh(ytdPnl)}</div>
+      <div class="tile-sub">Rev ${ksh(ytdRev)}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Days of Runway</div>
+      <div class="tile-value">${runway}w</div>
+      <div class="tile-sub">weeks at current burn</div>
+    </div>
+  `;
+
+  // P&L bar chart
+  const labels = ms.map(m => m.month || m.label || '?');
+  getChart('pnl-chart', 'bar', {
+    labels,
+    datasets: [
+      { label: 'Revenue', data: ms.map(m => m.revenue || 0), backgroundColor: '#2B7A42' },
+      { label: 'COGS',    data: ms.map(m => m.cogs || 0),    backgroundColor: '#e6a817' },
+    ]
+  }, { plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => 'K' + Math.round(v/1000) } } } });
+
+  // Stock alerts
+  const alerts = document.getElementById('stock-alerts');
+  const sh = (p.stockHealth || []).filter(x => x.status === 'critical' || x.status === 'low').slice(0,3);
+  if (!sh.length) {
+    alerts.innerHTML = '<div style="color:var(--text2);font-size:13px;">No urgent stock warnings.</div>';
+  } else {
+    alerts.innerHTML = sh.map(s => `
+      <div class="alert-item ${s.status === 'critical' ? 'red' : 'amber'}">
+        <strong>${s.sku || s.name}</strong> — ${s.status === 'critical' ? '🔴 Critical' : '⚠ Low'}<br>
+        <span style="font-size:12px;color:var(--text2)">${s.daysCover != null ? s.daysCover + ' days cover' : ''} · Run-out ${fmtDate(s.runoutDate)}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TAB 1 — DIRECT SALES
+// ─────────────────────────────────────────────
+function renderSales(p) {
+  const rxs = p.receivables || [];
+  const ms  = p.monthlySales || [];
+  const orders = p.salesOrders || [];
+  const drafts = orders.filter(o => o.status === 'draft').length;
+
+  // Top 5 customers by invoice total
+  const byCustomer = {};
+  rxs.forEach(r => { byCustomer[r.partnerName || 'Unknown'] = (byCustomer[r.partnerName || 'Unknown'] || 0) + (r.amount || 0); });
+  const top5 = Object.entries(byCustomer).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  getChart('customer-donut', 'doughnut', {
+    labels: top5.map(x=>x[0]),
+    datasets: [{ data: top5.map(x=>x[1]), backgroundColor: COLORS.slice(0,5) }]
+  }, { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } });
+
+  // Last 3 months revenue
+  const last3 = ms.slice(-3);
+  getChart('revenue-bar', 'bar', {
+    labels: last3.map(m => m.month || m.label || '?'),
+    datasets: [{ label: 'Revenue', data: last3.map(m => m.revenue || 0), backgroundColor: '#2B7A42' }]
+  }, { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'K' + Math.round(v/1000) } } } });
+
+  // Sales orders table
+  const openOrders = orders.filter(o => o.status !== 'done' && o.status !== 'cancelled');
+  const tableEl = document.getElementById('sales-orders-table');
+  if (!openOrders.length) {
+    tableEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No open orders.</p>';
+  } else {
+    tableEl.innerHTML = `<table>
+      <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Value</th><th>Status</th></tr></thead>
+      <tbody>${openOrders.map(o=>`
+        <tr>
+          <td>${o.ref || '—'}</td>
+          <td>${o.customer || '—'}</td>
+          <td>${fmtDate(o.date)}</td>
+          <td>${ksh(o.amount)}</td>
+          <td>${badge(o.status || 'open')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Summary tiles
+  const el = document.getElementById('sales-summary-tiles');
+  el.innerHTML = `
+    <div class="tile">
+      <div class="tile-label">Total Receivables</div>
+      <div class="tile-value" style="font-size:18px">${ksh(rxs.reduce((s,r)=>s+(r.amount||0),0))}</div>
+      <div class="tile-sub">${rxs.length} invoices</div>
+    </div>
+    <div class="tile amber">
+      <div class="tile-label">Draft Orders</div>
+      <div class="tile-value">${drafts}</div>
+      <div class="tile-sub">awaiting confirmation</div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────
+//  TAB 2 — COMMERCIAL / MARGINS
+// ─────────────────────────────────────────────
+function renderMargins(p) {
+  const products = p.sellingPrices || [];
+  const boms = p.boms || {};
+  const rawCosts = p.rawStockCosts || {};
+
+  // Compute BoM cost per product
+  const enriched = products.map(prod => {
+    const bomLines = boms[prod.ref] || [];
+    const bomCost = bomLines.reduce((s, line) => {
+      const costPerKg = rawCosts[line.material] || 0;
+      return s + (costPerKg * (line.qty || 0));
+    }, 0);
+    const margin = prod.sellingPrice && bomCost ? ((prod.sellingPrice - bomCost) / prod.sellingPrice * 100).toFixed(1) : null;
+    return { ...prod, bomCost, margin, belowCost: bomCost > 0 && prod.sellingPrice < bomCost };
+  });
+
+  // Horizontal bar chart: selling price vs cost
+  getChart('margin-chart', 'bar', {
+    labels: enriched.map(e => e.name || e.ref),
+    datasets: [
+      { label: 'Selling Price', data: enriched.map(e => e.sellingPrice || 0), backgroundColor: '#2B7A42' },
+      { label: 'BoM Cost',      data: enriched.map(e => e.bomCost || 0),      backgroundColor: '#e6a817' },
+    ]
+  }, {
+    indexAxis: 'y',
+    plugins: { legend: { position: 'bottom' } },
+    scales: { x: { ticks: { callback: v => 'K' + Math.round(v/1000) } } }
+  });
+
+  // Product table
+  const tableEl = document.getElementById('margin-table');
+  if (!enriched.length) {
+    tableEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No product data.</p>';
+  } else {
+    tableEl.innerHTML = `<table>
+      <thead><tr><th>Ref</th><th>Product</th><th>Selling Price</th><th>BoM Cost</th><th>Margin %</th><th>Status</th></tr></thead>
+      <tbody>${enriched.map(e=>`
+        <tr>
+          <td>${e.ref || '—'}</td>
+          <td>${e.name || '—'}</td>
+          <td>${ksh(e.sellingPrice)}</td>
+          <td>${ksh(e.bomCost)}</td>
+          <td style="color:${e.belowCost?'var(--red)':e.margin<10?'var(--amber)':'var(--green)'}">${e.margin != null ? e.margin + '%' : '—'}</td>
+          <td>${e.belowCost ? badge('critical') : badge('ok')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Below-cost alert
+  const belowCost = enriched.filter(e=>e.belowCost);
+  const alertEl = document.getElementById('below-cost-alert');
+  if (belowCost.length) {
+    alertEl.innerHTML = `<div class="alert-item red" style="margin-bottom:12px">
+      🔴 <strong>${belowCost.length} product(s) selling below cost:</strong> ${belowCost.map(e=>e.name||e.ref).join(', ')}
+    </div>`;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TAB 3 — FARMER PROCUREMENT
+// ─────────────────────────────────────────────
+function renderFarmer(p) {
+  const ph = p.purchaseHistory || [];
+  const valuation = p.valuationLayers || [];
+
+  // Procurement by supplier group
+  const byGroup = {};
+  ph.forEach(x => { byGroup[x.supplierGroup || 'Other'] = (byGroup[x.supplierGroup||'Other'] || 0) + (x.amount||0); });
+  const groups = Object.entries(byGroup);
+  getChart('supplier-bar', 'bar', {
+    labels: groups.map(g=>g[0]),
+    datasets: [{ label: 'Procurement (Ksh)', data: groups.map(g=>g[1]), backgroundColor: COLORS }]
+  }, { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'K' + Math.round(v/1000) } } } });
+
+  // Farmer payables table
+  const pays = (p.payables||[]).filter(x => ['farmer','supplier'].includes((x.partnerCategory||'').toLowerCase()));
+  const fPayEl = document.getElementById('farmer-payables-table');
+  if (!pays.length) {
+    fPayEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No outstanding farmer payments.</p>';
+  } else {
+    fPayEl.innerHTML = `<table>
+      <thead><tr><th>Supplier</th><th>Category</th><th>Amount</th><th>Due Date</th></tr></thead>
+      <tbody>${pays.map(r=>`
+        <tr>
+          <td>${r.partnerName||'—'}</td>
+          <td>${r.partnerCategory||'—'}</td>
+          <td>${ksh(r.amount)}</td>
+          <td>${fmtDate(r.dueDate)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Procurement breakdown (last completed month)
+  const lastMonth = ph.slice(-20);
+  const procEl = document.getElementById('procurement-table');
+  if (!lastMonth.length) {
+    procEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No purchase history.</p>';
+  } else {
+    procEl.innerHTML = `<table>
+      <thead><tr><th>Date</th><th>Supplier</th><th>Item</th><th>Qty (kg)</th><th>Unit Cost</th><th>Total</th></tr></thead>
+      <tbody>${lastMonth.map(r=>`
+        <tr>
+          <td>${fmtDate(r.date)}</td>
+          <td>${r.supplierName||'—'}</td>
+          <td>${r.item||'—'}</td>
+          <td>${r.qty!=null?r.qty.toLocaleString():'—'}</td>
+          <td>${ksh(r.unitCost)}</td>
+          <td>${ksh(r.amount)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Unit cost tracker — line chart per RM
+  const rmNames = [...new Set(valuation.map(v=>v.material))];
+  const months  = [...new Set(valuation.map(v=>v.month))].sort();
+  const datasets = rmNames.map((rm, i) => ({
+    label: rm,
+    data: months.map(mo => { const v = valuation.find(x=>x.material===rm&&x.month===mo); return v ? v.costPerKg : null; }),
+    borderColor: COLORS[i % COLORS.length],
+    backgroundColor: 'transparent',
+    tension: .3,
+    spanGaps: true,
+  }));
+  getChart('cost-tracker-chart', 'line', { labels: months, datasets }, {
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+    scales: { y: { title: { display: true, text: 'Ksh / kg' } } }
+  });
+}
+
+// ─────────────────────────────────────────────
+//  TAB 4 — STOCK
+// ─────────────────────────────────────────────
+function renderStock(p) {
+  const sh = p.stockHealth || [];
+  const rms = p.rawStock || [];
+
+  // Finished goods health table
+  const shEl = document.getElementById('stock-health-table');
+  if (!sh.length) {
+    shEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No stock health data.</p>';
+  } else {
+    shEl.innerHTML = `<table>
+      <thead><tr><th>SKU</th><th>On Shelf</th><th>Sales/mo</th><th>Run-out</th><th>Days Cover</th><th>Producible</th><th>Bottleneck RM</th><th>Status</th></tr></thead>
+      <tbody>${sh.map(s=>`
+        <tr>
+          <td>${s.sku||'—'}</td>
+          <td>${s.onShelf!=null?s.onShelf.toLocaleString():'—'}</td>
+          <td>${s.salesPerMonth!=null?s.salesPerMonth.toLocaleString():'—'}</td>
+          <td>${fmtDate(s.runoutDate)}</td>
+          <td>${s.daysCover!=null?s.daysCover+'d':'—'}</td>
+          <td>${s.producible!=null?s.producible.toLocaleString():'—'}</td>
+          <td>${s.bottleneckRM||'—'}</td>
+          <td>${badge(s.status||'ok')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Raw materials table
+  const rmEl = document.getElementById('raw-materials-table');
+  if (!rms.length) {
+    rmEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No raw material data.</p>';
+  } else {
+    rmEl.innerHTML = `<table>
+      <thead><tr><th>Material</th><th>On Hand (kg)</th><th>Monthly Use</th><th>Weeks Cover</th><th>Incoming</th><th>Stockout</th></tr></thead>
+      <tbody>${rms.map(r=>`
+        <tr>
+          <td>${r.name||'—'}</td>
+          <td>${r.onHand!=null?r.onHand.toLocaleString():'—'}</td>
+          <td>${r.monthlyUsage!=null?r.monthlyUsage.toLocaleString():'—'}</td>
+          <td>${r.monthlyUsage>0?Math.round(r.onHand/(r.monthlyUsage/4))+'w':'∞'}</td>
+          <td>${r.incoming!=null?r.incoming.toLocaleString():'—'}</td>
+          <td>${fmtDate(r.stockoutDate)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Production runway
+  const runway = document.getElementById('production-runway');
+  if (!sh.length) { runway.innerHTML = '<p style="color:var(--text2);font-size:13px">No data.</p>'; return; }
+  runway.innerHTML = sh.map(s=>{
+    const pct = s.producible && s.salesPerMonth ? Math.min(Math.round(s.producible/s.salesPerMonth*100),200) : 0;
+    const cls = pct < 30 ? 'red' : pct < 80 ? 'amber' : '';
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span>${s.sku||s.name}</span>
+        <span style="color:var(--text2)">${s.producible!=null?s.producible.toLocaleString():0} units producible</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+//  TAB 5 — PROCUREMENT (RAW MATERIALS)
+// ─────────────────────────────────────────────
+function renderProcure(p) {
+  const rms = p.rawStock || [];
+  const pending = p.pendingReceipts || [];
+  const ph = p.purchaseHistory || [];
+
+  // Coverage table with editable stock
+  const covEl = document.getElementById('rm-coverage-table');
+  if (!rms.length) {
+    covEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No raw material data.</p>';
+  } else {
+    covEl.innerHTML = `<table>
+      <thead><tr><th>Material</th><th>On Hand (kg)</th><th>Monthly Need</th><th>Coverage</th><th>Deadline</th><th>Supplier</th></tr></thead>
+      <tbody id="rm-coverage-body"></tbody></table>`;
+    const tbody = document.getElementById('rm-coverage-body');
+    tbody.innerHTML = rms.map((r,i)=>{
+      const wks = r.monthlyUsage > 0 ? Math.round(r.onHand/(r.monthlyUsage/4)) : 99;
+      const cls = wks < 2 ? 'red' : wks < 4 ? 'amber' : '';
+      const pct = Math.min(wks*25, 100);
+      return `<tr>
+        <td>${r.name||'—'}</td>
+        <td><input class="editable-input" type="number" value="${r.onHand||0}" onchange="updateCoverage(${i}, this.value)" /></td>
+        <td>${r.monthlyUsage!=null?r.monthlyUsage.toLocaleString():'—'}</td>
+        <td>
+          <div>${wks}w</div>
+          <div class="progress-bar" style="width:120px"><div class="progress-fill ${cls}" style="width:${pct}%"></div></div>
+        </td>
+        <td>${fmtDate(r.reorderDeadline)}</td>
+        <td>${r.supplier||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Incoming POs
+  const posEl = document.getElementById('incoming-pos-table');
+  if (!pending.length) {
+    posEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No incoming POs.</p>';
+  } else {
+    posEl.innerHTML = `<table>
+      <thead><tr><th>PO Ref</th><th>Supplier</th><th>Item</th><th>Qty (kg)</th><th>Expected</th><th>Status</th></tr></thead>
+      <tbody>${pending.map(r=>`
+        <tr>
+          <td>${r.ref||'—'}</td>
+          <td>${r.supplierName||'—'}</td>
+          <td>${r.item||'—'}</td>
+          <td>${r.qty!=null?r.qty.toLocaleString():'—'}</td>
+          <td>${fmtDate(r.expectedDate)}</td>
+          <td>${badge(r.status||'open')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  // Purchase history — last 3 prices per ingredient
+  const byItem = {};
+  ph.forEach(r => {
+    if (!byItem[r.item]) byItem[r.item] = [];
+    byItem[r.item].push(r);
+  });
+  const histEl = document.getElementById('purchase-history-table');
+  const rows = [];
+  Object.entries(byItem).forEach(([item, entries]) => {
+    entries.sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,3).forEach(e => {
+      rows.push({ item, ...e });
+    });
+  });
+  if (!rows.length) {
+    histEl.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:8px">No purchase history.</p>';
+  } else {
+    histEl.innerHTML = `<table>
+      <thead><tr><th>Ingredient</th><th>Date</th><th>Supplier</th><th>Qty (kg)</th><th>Unit Cost (Ksh/kg)</th><th>Total</th></tr></thead>
+      <tbody>${rows.map(r=>`
+        <tr>
+          <td>${r.item||'—'}</td>
+          <td>${fmtDate(r.date)}</td>
+          <td>${r.supplierName||'—'}</td>
+          <td>${r.qty!=null?r.qty.toLocaleString():'—'}</td>
+          <td>${r.unitCost!=null?r.unitCost.toLocaleString():'—'}</td>
+          <td>${ksh(r.amount)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+}
+
+function updateCoverage(idx, val) {
+  if (_payload && _payload.rawStock && _payload.rawStock[idx]) {
+    _payload.rawStock[idx].onHand = parseFloat(val) || 0;
+    try { renderProcure(_payload); } catch {}
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DEMO PAYLOAD (used when SCRIPT_URL not set)
+// ─────────────────────────────────────────────
+function getDemoPayload() {
+  return {
+    cashBalance: 1240000,
+    receivables: [
+      { partnerName: 'KOMEX Ltd',       amount: 840000, invoiceDate: '2026-09-15', partnerCategory: 'customer' },
+      { partnerName: 'Naivas Supermarket', amount: 320000, invoiceDate: '2026-10-01', partnerCategory: 'customer' },
+      { partnerName: 'Quickmart',       amount: 180000, invoiceDate: '2026-09-28', partnerCategory: 'customer' },
+      { partnerName: 'Carrefour Kenya', amount: 540000, invoiceDate: '2026-09-10', partnerCategory: 'customer' },
+      { partnerName: 'Eastmatt',        amount: 95000,  invoiceDate: '2026-10-05', partnerCategory: 'customer' },
+    ],
+    payables: [
+      { partnerName: 'Wanjiku Farms',    amount: 78000,  partnerCategory: 'farmer', dueDate: '2026-10-15' },
+      { partnerName: 'Meru Grain Co.',   amount: 145000, partnerCategory: 'supplier', dueDate: '2026-10-20' },
+      { partnerName: 'Karuturi Ltd',     amount: 230000, partnerCategory: 'farmer', dueDate: '2026-10-12' },
+    ],
+    monthlySales: [
+      { month: 'May 26',  revenue: 1850000, cogs: 1240000 },
+      { month: 'Jun 26',  revenue: 2100000, cogs: 1430000 },
+      { month: 'Jul 26',  revenue: 1960000, cogs: 1320000 },
+      { month: 'Aug 26',  revenue: 2400000, cogs: 1580000 },
+      { month: 'Sep 26',  revenue: 2250000, cogs: 1490000 },
+      { month: 'Oct 26',  revenue: 1100000, cogs: 730000  },
+    ],
+    salesOrders: [
+      { ref: 'SO/2026/0841', customer: 'KOMEX Ltd',        date: '2026-10-08', amount: 420000, status: 'open' },
+      { ref: 'SO/2026/0842', customer: 'Naivas Supermarket', date: '2026-10-09', amount: 180000, status: 'draft' },
+      { ref: 'SO/2026/0843', customer: 'Quickmart',        date: '2026-10-10', amount: 95000,  status: 'open' },
+    ],
+    sellingPrices: [
+      { ref: 'DC-WF-2KG',  name: 'Dashcrop Wheat Flour 2kg',     sellingPrice: 250 },
+      { ref: 'DC-MZF-1KG', name: 'Dashcrop Maize Flour 1kg',     sellingPrice: 120 },
+      { ref: 'DC-CF-5KG',  name: 'Dashcrop Composite Flour 5kg', sellingPrice: 580 },
+      { ref: 'DC-SF-2KG',  name: 'Dashcrop Sorghum Flour 2kg',   sellingPrice: 310 },
+    ],
+    boms: {
+      'DC-WF-2KG':  [{ material: 'Wheat grain', qty: 2.2 }, { material: 'Packaging', qty: 1 }],
+      'DC-MZF-1KG': [{ material: 'Maize grain', qty: 1.1 }],
+      'DC-CF-5KG':  [{ material: 'Wheat grain', qty: 2.5 }, { material: 'Maize grain', qty: 1.5 }, { material: 'Sorghum grain', qty: 1 }, { material: 'Packaging', qty: 1 }],
+      'DC-SF-2KG':  [{ material: 'Sorghum grain', qty: 2.3 }],
+    },
+    rawStockCosts: { 'Wheat grain': 72, 'Maize grain': 45, 'Sorghum grain': 85, 'Packaging': 15 },
+    stockHealth: [
+      { sku: 'DC-WF-2KG',  onShelf: 1200, salesPerMonth: 800,  runoutDate: '2026-10-25', daysCover: 15, producible: 600,  bottleneckRM: 'Wheat grain',   status: 'low' },
+      { sku: 'DC-MZF-1KG', onShelf: 3500, salesPerMonth: 2000, runoutDate: '2026-11-07', daysCover: 28, producible: 4000, bottleneckRM: null,            status: 'ok' },
+      { sku: 'DC-CF-5KG',  onShelf: 80,   salesPerMonth: 400,  runoutDate: '2026-10-12', daysCover: 6,  producible: 90,   bottleneckRM: 'Sorghum grain', status: 'critical' },
+      { sku: 'DC-SF-2KG',  onShelf: 450,  salesPerMonth: 300,  runoutDate: '2026-10-30', daysCover: 20, producible: 200,  bottleneckRM: 'Sorghum grain', status: 'low' },
+    ],
+    rawStock: [
+      { name: 'Wheat grain',   onHand: 5800, monthlyUsage: 6000, incoming: 4000, stockoutDate: '2026-10-18', reorderDeadline: '2026-10-14', supplier: 'Meru Grain Co.' },
+      { name: 'Maize grain',   onHand: 12000, monthlyUsage: 5000, incoming: 0,   stockoutDate: '2026-11-12', reorderDeadline: '2026-10-28', supplier: 'Karuturi Ltd' },
+      { name: 'Sorghum grain', onHand: 1100,  monthlyUsage: 2500, incoming: 2000, stockoutDate: '2026-10-14', reorderDeadline: '2026-10-11', supplier: 'Wanjiku Farms' },
+      { name: 'Packaging',     onHand: 8000,  monthlyUsage: 3000, incoming: 0,   stockoutDate: '2026-11-03', reorderDeadline: '2026-10-25', supplier: 'PackPro Kenya' },
+    ],
+    purchaseHistory: [
+      { date: '2026-10-02', supplierName: 'Meru Grain Co.',  supplierGroup: 'Grain Traders', item: 'Wheat grain',   qty: 4000, unitCost: 70, amount: 280000 },
+      { date: '2026-09-15', supplierName: 'Meru Grain Co.',  supplierGroup: 'Grain Traders', item: 'Wheat grain',   qty: 5000, unitCost: 72, amount: 360000 },
+      { date: '2026-09-01', supplierName: 'Meru Grain Co.',  supplierGroup: 'Grain Traders', item: 'Wheat grain',   qty: 3000, unitCost: 68, amount: 204000 },
+      { date: '2026-10-05', supplierName: 'Karuturi Ltd',    supplierGroup: 'Farmer Co-ops', item: 'Maize grain',   qty: 6000, unitCost: 44, amount: 264000 },
+      { date: '2026-09-18', supplierName: 'Karuturi Ltd',    supplierGroup: 'Farmer Co-ops', item: 'Maize grain',   qty: 4000, unitCost: 45, amount: 180000 },
+      { date: '2026-09-05', supplierName: 'Wanjiku Farms',   supplierGroup: 'Smallholder',   item: 'Maize grain',   qty: 2000, unitCost: 46, amount: 92000  },
+      { date: '2026-09-22', supplierName: 'Wanjiku Farms',   supplierGroup: 'Smallholder',   item: 'Sorghum grain', qty: 3000, unitCost: 84, amount: 252000 },
+      { date: '2026-09-08', supplierName: 'Wanjiku Farms',   supplierGroup: 'Smallholder',   item: 'Sorghum grain', qty: 2000, unitCost: 83, amount: 166000 },
+    ],
+    valuationLayers: [
+      { material: 'Wheat grain',   month: 'Jul 26', costPerKg: 65 },
+      { material: 'Wheat grain',   month: 'Aug 26', costPerKg: 68 },
+      { material: 'Wheat grain',   month: 'Sep 26', costPerKg: 72 },
+      { material: 'Wheat grain',   month: 'Oct 26', costPerKg: 70 },
+      { material: 'Maize grain',   month: 'Jul 26', costPerKg: 42 },
+      { material: 'Maize grain',   month: 'Aug 26', costPerKg: 44 },
+      { material: 'Maize grain',   month: 'Sep 26', costPerKg: 45 },
+      { material: 'Maize grain',   month: 'Oct 26', costPerKg: 44 },
+      { material: 'Sorghum grain', month: 'Jul 26', costPerKg: 80 },
+      { material: 'Sorghum grain', month: 'Aug 26', costPerKg: 82 },
+      { material: 'Sorghum grain', month: 'Sep 26', costPerKg: 84 },
+      { material: 'Sorghum grain', month: 'Oct 26', costPerKg: 85 },
+    ],
+    pendingReceipts: [
+      { ref: 'PO/2026/0124', supplierName: 'Meru Grain Co.',  item: 'Wheat grain',   qty: 4000, expectedDate: '2026-10-13', status: 'open' },
+      { ref: 'PO/2026/0125', supplierName: 'Wanjiku Farms',   item: 'Sorghum grain', qty: 2000, expectedDate: '2026-10-12', status: 'open' },
+    ],
+  };
+}
+
+// ─────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────
+fetchData(false);
+</script>
+</body>
+</html>
