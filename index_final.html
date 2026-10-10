@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashcrop Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* ── PASTE YOUR APPS SCRIPT URL BELOW in the JS section (search for SCRIPT_URL) ── */
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#2B7A42;--green-light:#3da358;--green-bg:#edf7f0;--green-bdr:#b3dfc2;
+  --bg:#F7F8F5;--surface:#fff;--surface2:#f0f1ec;
+  --border:#E2DDD6;--border2:#ccc9bc;
+  --text:#1A1916;--text2:#6B6860;--text3:#9c9a91;
+  --crit-bg:#fef0ee;--crit-txt:#c0341d;--crit-bdr:#f5c4b3;
+  --low-bg:#fef9ec;--low-txt:#8a5c0a;--low-bdr:#f5d98a;
+  --ok-bg:#edf7f0;--ok-txt:#2B7A42;--ok-bdr:#b3dfc2;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'SF Mono','Fira Code',monospace;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1a1b17;--surface:#242520;--surface2:#2e2f29;
+    --border:#3a3b34;--border2:#4a4b42;
+    --text:#f0ede8;--text2:#a8a59e;--text3:#6b6860;
+    --crit-bg:#3a1a16;--low-bg:#2e2410;--ok-bg:#162318;
+  }
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
+header{background:var(--green);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.htitle{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.hsub{font-size:10px;color:rgba(255,255,255,.5);margin-top:1px}
+.refresh-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-family:var(--font);font-size:11px;font-weight:500;padding:5px 14px;border-radius:6px;cursor:pointer}
+.refresh-btn:hover{background:rgba(255,255,255,.25)}
+.refresh-btn:disabled{opacity:.4;cursor:default}
+#freshnessBanner{display:none;background:#fff3cd;border-bottom:1px solid #f5d98a;padding:8px 20px;font-size:11px;color:#8a5c0a;font-weight:500}
+.tabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 20px;gap:0;overflow-x:auto}
+.tab-btn{padding:10px 16px;font-family:var(--font);font-size:12px;font-weight:500;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .15s}
+.tab-btn:hover{color:var(--text2)}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--green)}
+.tab-page{display:none}.tab-page.active{display:block}
+main{padding:16px 20px 60px;max-width:1400px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.mlabel{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:6px}
+.mval{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--text);line-height:1}
+.mval.danger{color:var(--crit-txt)}.mval.warn{color:var(--low-txt)}.mval.good{color:var(--green)}
+.msub{font-size:10px;color:var(--text3);margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.card-header{padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-body{padding:14px 16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+thead th{background:var(--surface2);text-align:left;font-size:9.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--text3);padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:7px 10px;vertical-align:middle}
+.mono{font-family:var(--mono);font-size:11px;text-align:right}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.2px;white-space:nowrap}
+.badge.critical{background:var(--crit-bg);color:var(--crit-txt);border:1px solid var(--crit-bdr)}
+.badge.low{background:var(--low-bg);color:var(--low-txt);border:1px solid var(--low-bdr)}
+.badge.ok{background:var(--ok-bg);color:var(--ok-txt);border:1px solid var(--ok-bdr)}
+.badge.grey{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+.covbar-bg{width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
+.covbar-fill{height:100%;border-radius:3px}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--text3)}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:var(--crit-bg);border:1px solid var(--crit-bdr);border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px;color:var(--crit-txt);display:none}
+.alert-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:11px}
+.alert-item.critical{background:var(--crit-bg);border:1px solid var(--crit-bdr);color:var(--crit-txt)}
+.alert-item.low{background:var(--low-bg);border:1px solid var(--low-bdr);color:var(--low-txt)}
+.chart-wrap{position:relative;height:220px}
+.tfoot{padding:8px 12px;font-size:10px;color:var(--text3);border-top:1px solid var(--border);background:var(--surface2)}
+@media(max-width:700px){.grid2,.grid3{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="htitle">Dashcrop Dashboard</div>
+    <div class="hsub" id="headerSub">Loading…</div>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="cacheClear();loadAll(true)">↻ Refresh</button>
+</header>
+
+<div id="freshnessBanner"></div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('overview',this)">🏠 Overview</button>
+  <button class="tab-btn" onclick="switchTab('sales',this)">📊 Direct Sales</button>
+  <button class="tab-btn" onclick="switchTab('margins',this)">💰 Margins</button>
+  <button class="tab-btn" onclick="switchTab('farmers',this)">🌾 Farmer Procurement</button>
+  <button class="tab-btn" onclick="switchTab('stock',this)">📦 Stock</button>
+  <button class="tab-btn" onclick="switchTab('procurement',this)">🛒 Procurement</button>
+</div>
+
+<main>
+  <div class="err-box" id="errBox"></div>
+
+  <!-- ══ OVERVIEW ══════════════════════════════════════════════════════════ -->
+  <div class="tab-page active" id="page-overview">
+
+    <div class="metrics" id="overview-metrics">
+      <div class="metric"><div class="mlabel">Cash Position</div><div class="mval" id="m-cash">—</div><div class="msub" id="m-cash-sub"></div></div>
+      <div class="metric"><div class="mlabel">Total Receivables</div><div class="mval" id="m-rec">—</div><div class="msub" id="m-rec-sub"></div></div>
+      <div class="metric"><div class="mlabel">Total Payables</div><div class="mval" id="m-pay">—</div><div class="msub" id="m-pay-sub"></div></div>
+      <div class="metric"><div class="mlabel">Revenue (last 3 mo)</div><div class="mval" id="m-rev">—</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header">⚠️ Stock Alerts</div>
+        <div class="card-body" id="overview-alerts"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">📈 Revenue by Month (Ksh)</div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="chart-rev-month"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header">📤 Top Receivables</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Customer</th><th>Invoice</th><th style="text-align:right">Amount (Ksh)</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody id="overview-rec-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📥 Top Payables</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Supplier</th><th style="text-align:right">Amount (Ksh)</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody id="overview-pay-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DIRECT SALES ══════════════════════════════════════════════════════ -->
+  <div class="tab-page" id="page-sales">
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-header">Revenue by Product (Ksh — last 3 months)</div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="chart-sales-product"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Units Sold by Month</div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="chart-sales-units"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Sales by Product — Last 3 Months</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Product</th><th style="text-align:right">Units sold</th><th style="text-align:right">Revenue (Ksh)</th><th style="text-align:right">Avg price / unit</th><th style="text-align:right">Avg monthly</th></tr></thead>
+          <tbody id="sales-tbody"></tbody>
+        </table>
+      </div>
+      <div class="tfoot" id="sales-tfoot"></div>
+    </div>
+  </div>
+
+  <!-- ══ MARGINS ══════════════════════════════════════════════════════════ -->
+  <div class="tab-page" id="page-margins">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header">⚠️ Margin Alerts</div>
+      <div class="card-body" id="margin-alerts"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Product Margins — Selling Price vs BoM Cost</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Product</th>
+            <th style="text-align:right">Selling Price</th>
+            <th style="text-align:right">BoM Cost (est.)</th>
+            <th style="text-align:right">Gross Margin</th>
+            <th style="text-align:right">Margin %</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody id="margin-tbody"></tbody>
+        </table>
+      </div>
+      <div class="tfoot">BoM cost estimated from raw stock standard_price × BoM quantities. Fix zero-cost raw materials in Odoo (Inventory → Products → Standard Price) for accurate margins.</div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-header">Margin Bar Chart</div>
+      <div class="card-body"><div class="chart-wrap" style="height:280px"><canvas id="chart-margins"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ══ FARMER PROCUREMENT ════════════════════════════════════════════════ -->
+  <div class="tab-page" id="page-farmers">
+    <div class="metrics">
+      <div class="metric"><div class="mlabel">Total Payable to Farmers</div><div class="mval danger" id="m-farmer-payable">—</div></div>
+      <div class="metric"><div class="mlabel">Overdue Farmer Payments</div><div class="mval danger" id="m-farmer-overdue">—</div></div>
+      <div class="metric"><div class="mlabel">Suppliers (last 6 mo)</div><div class="mval" id="m-farmer-count">—</div></div>
+      <div class="metric"><div class="mlabel">Avg Cost / kg (RM)</div><div class="mval" id="m-farmer-cost">—</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header">Outstanding Payments to Farmers/Suppliers</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Supplier</th><th style="text-align:right">Amount Owed (Ksh)</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody id="farmer-payables-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Recent Procurement — Last 3 Months</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Product</th><th>Supplier</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price (Ksh)</th><th>PO</th></tr></thead>
+            <tbody id="farmer-history-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-header">Unit Cost by Raw Material — Last 3 Months</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="chart-rm-cost"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ══ STOCK ══════════════════════════════════════════════════════════════ -->
+  <div class="tab-page" id="page-stock">
+    <div class="metrics">
+      <div class="metric"><div class="mlabel">Critical SKUs</div><div class="mval danger" id="sh-crit">—</div></div>
+      <div class="metric"><div class="mlabel">Low Stock SKUs</div><div class="mval warn" id="sh-low">—</div></div>
+      <div class="metric"><div class="mlabel">FG SKUs Tracked</div><div class="mval" id="sh-total">—</div></div>
+      <div class="metric"><div class="mlabel">Top Bottleneck RM</div><div class="mval" id="sh-bottleneck" style="font-size:13px">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📦 Finished Goods — Stock Health</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>SKU</th>
+            <th style="text-align:right">On Shelf</th>
+            <th style="text-align:right">Sales / mo</th>
+            <th style="text-align:right">Coverage</th>
+            <th>Run-out Date</th>
+            <th style="text-align:right">Producible</th>
+            <th>Bottleneck RM</th>
+            <th style="text-align:center">Status</th>
+          </tr></thead>
+          <tbody id="sh-tbody"></tbody>
+        </table>
+      </div>
+      <div class="tfoot" id="sh-tfoot">Load data to see stock health</div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-header">🧪 Raw Materials — Coverage</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Raw Material</th>
+            <th style="text-align:right">On Hand (kg)</th>
+            <th style="text-align:right">Cost / kg</th>
+            <th style="text-align:right">Stock Value</th>
+            <th>Source</th>
+          </tr></thead>
+          <tbody id="rm-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PROCUREMENT ════════════════════════════════════════════════════════ -->
+  <div class="tab-page" id="page-procurement">
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header">📬 Incoming Receipts (from Odoo)</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Supplier</th><th>Products</th><th>Expected Date</th><th>Status</th></tr></thead>
+          <tbody id="incoming-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📋 Purchase History — Last 6 Months (most recent 3 POs per material)</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Material</th>
+            <th style="text-align:right">Latest PO Price</th>
+            <th style="text-align:right">2nd PO</th>
+            <th style="text-align:right">3rd PO</th>
+            <th>Latest Date</th>
+            <th>Supplier</th>
+          </tr></thead>
+          <tbody id="ph-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  PASTE YOUR APPS SCRIPT WEB APP URL HERE:                              ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyV-2_qFiFLOrNwQCGb--Urc3xILdrLAfdnpzzhTRYRNHomlDfuPM8mhwzQDo-V3Tkd/exec';
+
+// ── Cache ────────────────────────────────────────────────────────────────────
+const CACHE_KEY = 'dashcrop_payload_v1';
+const CACHE_TTL = 30 * 60 * 1000; // 30 min
+let _payload = null;
+
+function lsCacheGet() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) return null;
+    return data;
+  } catch(e) { return null; }
+}
+function lsCacheSet(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+function cacheClear() {
+  try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
+  _payload = null;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function ksh(v) { return 'Ksh ' + Math.round(v || 0).toLocaleString(); }
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' });
+}
+function safeRender(fn) {
+  try { fn(); } catch(e) { console.error('Render error:', e); }
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (_payload) {
+    if (id === 'sales')       safeRender(renderSales);
+    if (id === 'margins')     safeRender(renderMargins);
+    if (id === 'farmers')     safeRender(renderFarmers);
+    if (id === 'stock')       safeRender(renderStock);
+    if (id === 'procurement') safeRender(renderProcurement);
+  }
+}
+
+// ── Chart instances (kept to allow destroy-before-recreate) ──────────────────
+const _charts = {};
+function makeChart(id, config) {
+  if (_charts[id]) { _charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  _charts[id] = new Chart(ctx, config);
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────────
+async function loadAll(forceRefresh = false) {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+
+  if (SCRIPT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') {
+    document.getElementById('errBox').style.display = 'block';
+    document.getElementById('errBox').innerHTML =
+      '<b>Setup needed:</b> Paste your Apps Script Web App URL into the SCRIPT_URL constant in this file.';
+    btn.disabled = false;
+    return;
+  }
+
+  if (!forceRefresh && _payload) {
+    applyPayload(_payload); btn.disabled = false; return;
+  }
+  if (!forceRefresh) {
+    const cached = lsCacheGet();
+    if (cached) {
+      _payload = cached; applyPayload(cached);
+      document.getElementById('headerSub').textContent = 'Cached data · click ↻ for live';
+      btn.disabled = false; return;
+    }
+  }
+
+  document.getElementById('errBox').style.display = 'none';
+  document.getElementById('headerSub').textContent = 'Loading live data…';
+
+  try {
+    const url = SCRIPT_URL + (forceRefresh ? '?data=1&refresh=1' : '?data=1');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    if (payload.error) throw new Error(payload.error);
+    _payload = payload;
+    lsCacheSet(payload);
+    applyPayload(payload);
+  } catch(e) {
+    document.getElementById('errBox').style.display = 'block';
+    document.getElementById('errBox').innerHTML = '<b>Could not load data:</b> ' + e.message;
+    document.getElementById('headerSub').textContent = 'Error — check Apps Script deployment';
+  }
+  btn.disabled = false;
+}
+
+// ── Apply payload ─────────────────────────────────────────────────────────────
+function applyPayload(p) {
+  updateHeader(p);
+  safeRender(() => renderOverview(p));
+  safeRender(() => renderSales(p));
+}
+
+function updateHeader(p) {
+  const meta     = p.meta || {};
+  const isLive   = meta.stockSource === 'live';
+  const genAt    = meta.generatedAt ? new Date(meta.generatedAt) : null;
+  const ageHrs   = genAt ? (Date.now() - genAt.getTime()) / 3600000 : null;
+  const dot      = isLive ? '●' : '⚠';
+  const src      = isLive ? 'Live from Odoo' : 'Cached';
+  const timeStr  = genAt ? genAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+  document.getElementById('headerSub').innerHTML =
+    `<span style="color:${isLive?'#6ee7c0':'#f4a96a'}">${dot} ${src}</span>${timeStr ? ' · Updated ' + timeStr : ''}`;
+
+  const banner = document.getElementById('freshnessBanner');
+  if (ageHrs && ageHrs > 2) {
+    banner.style.display = 'block';
+    banner.innerHTML = `⏰ Data is ${ageHrs.toFixed(1)} hours old — <a href="javascript:cacheClear();loadAll(true)" style="color:inherit;font-weight:700">refresh now</a>`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OVERVIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderOverview(p) {
+  const cash  = (p.cashBalance || {}).total || 0;
+  const rec   = (p.receivables || []).reduce((s,r) => s + r.amount, 0);
+  const pay   = (p.payables   || []).reduce((s,r) => s + r.amount, 0);
+  const overdueRec = (p.receivables||[]).filter(r=>r.overdue).length;
+  const overduePay = (p.payables||[]).filter(r=>r.overdue).length;
+
+  // Revenue from monthlySales
+  let totalRev = 0;
+  Object.values(p.monthlySales || {}).forEach(m => {
+    Object.values(m).forEach(v => { totalRev += (typeof v === 'object' ? (v.revenue||0) : 0); });
+  });
+
+  // Metrics
+  const cashEl = document.getElementById('m-cash');
+  cashEl.textContent = ksh(cash);
+  cashEl.className = 'mval ' + (cash < 0 ? 'danger' : cash < 500000 ? 'warn' : 'good');
+  document.getElementById('m-cash-sub').textContent = cash < 0 ? 'Negative — urgent' : cash < 500000 ? 'Low' : 'Healthy';
+  document.getElementById('m-rec').textContent = ksh(rec);
+  document.getElementById('m-rec-sub').textContent = overdueRec + ' overdue';
+  document.getElementById('m-pay').textContent = ksh(pay);
+  document.getElementById('m-pay').className = 'mval ' + (pay > 0 ? 'warn' : '');
+  document.getElementById('m-rev').textContent = ksh(totalRev);
+
+  // Stock alerts
+  const alertEl = document.getElementById('overview-alerts');
+  const sh = (p.stockHealth || []).filter(s => s.status !== 'ok').slice(0, 5);
+  if (!sh.length) {
+    alertEl.innerHTML = '<div style="color:var(--ok-txt);font-size:11px">✅ All stock levels healthy</div>';
+  } else {
+    alertEl.innerHTML = sh.map(s => {
+      const cls = s.status === 'critical' ? 'critical' : 'low';
+      const icon = s.status === 'critical' ? '🔴' : '🟡';
+      const runOut = s.runOutDate ? ' · runs out ' + fmtDate(s.runOutDate) : '';
+      return `<div class="alert-item ${cls}">${icon} <div><b>${s.name || s.ref}</b>${runOut}${s.bottleneck ? '<div style="font-size:10px;opacity:.8">Bottleneck: '+s.bottleneck+'</div>':''}
+      </div></div>`;
+    }).join('');
+  }
+
+  // Revenue by month chart
+  const months = Object.keys(p.monthlySales || {}).sort();
+  const monthRevs = months.map(m => {
+    return Object.values(p.monthlySales[m] || {}).reduce((s,v) => s + (typeof v==='object'?(v.revenue||0):0), 0);
+  });
+  makeChart('chart-rev-month', {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{ label: 'Revenue (Ksh)', data: monthRevs, backgroundColor: '#2B7A42cc', borderRadius: 4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales: { y: { ticks: { callback: v => 'K'+Math.round(v/1000) } } } }
+  });
+
+  // Receivables table (top 5)
+  const recTbody = document.getElementById('overview-rec-tbody');
+  const topRec   = (p.receivables||[]).slice(0,6);
+  recTbody.innerHTML = topRec.length
+    ? topRec.map(r => `<tr>
+        <td style="font-weight:500">${r.partner}</td>
+        <td style="font-size:10px;color:var(--text3)">${r.ref}</td>
+        <td class="mono">${ksh(r.amount)}</td>
+        <td style="font-size:11px">${fmtDate(r.dueDate)}</td>
+        <td><span class="badge ${r.overdue?'critical':'low'}">${r.overdue?'Overdue':'Open'}</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--text3)">No open receivables</td></tr>';
+
+  // Payables table (top 5)
+  const payTbody = document.getElementById('overview-pay-tbody');
+  const topPay   = (p.payables||[]).slice(0,6);
+  payTbody.innerHTML = topPay.length
+    ? topPay.map(r => `<tr>
+        <td style="font-weight:500">${r.partner}</td>
+        <td class="mono">${ksh(r.amount)}</td>
+        <td style="font-size:11px">${fmtDate(r.dueDate)}</td>
+        <td><span class="badge ${r.overdue?'critical':'grey'}">${r.overdue?'Overdue':'Pending'}</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text3)">No open payables</td></tr>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SALES
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderSales(p) {
+  p = p || _payload; if (!p) return;
+
+  // Aggregate by product across all months
+  const byProduct = {};
+  const months = Object.keys(p.monthlySales || {}).sort();
+  months.forEach(m => {
+    Object.entries(p.monthlySales[m] || {}).forEach(([ref, v]) => {
+      if (!byProduct[ref]) byProduct[ref] = { qty: 0, revenue: 0 };
+      byProduct[ref].qty     += (typeof v==='object' ? (v.qty||0) : v);
+      byProduct[ref].revenue += (typeof v==='object' ? (v.revenue||0) : 0);
+    });
+  });
+
+  const sorted = Object.entries(byProduct)
+    .map(([ref, d]) => ({ ref, ...d, avgMonthly: d.qty / (months.length||1), avgPrice: d.qty>0?d.revenue/d.qty:0 }))
+    .sort((a,b) => b.revenue - a.revenue);
+
+  // Revenue by product chart (top 8)
+  const top8 = sorted.slice(0, 8);
+  makeChart('chart-sales-product', {
+    type: 'doughnut',
+    data: {
+      labels: top8.map(r => r.ref),
+      datasets: [{ data: top8.map(r => Math.round(r.revenue)), backgroundColor: [
+        '#2B7A42','#3da358','#5cbf76','#8ad4a0','#c1eacc',
+        '#f5a623','#e07b1e','#c05a10'
+      ]}]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right',labels:{font:{size:10}}}} }
+  });
+
+  // Units by month chart
+  const allRefs = [...new Set(months.flatMap(m => Object.keys(p.monthlySales[m]||{})))].slice(0, 5);
+  const colors  = ['#2B7A42','#f5a623','#c05a10','#185FA5','#8B5CF6'];
+  makeChart('chart-sales-units', {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: allRefs.map((ref, i) => ({
+        label: ref,
+        data: months.map(m => {
+          const v = (p.monthlySales[m]||{})[ref];
+          return typeof v==='object' ? (v.qty||0) : (v||0);
+        }),
+        backgroundColor: colors[i]+'cc',
+        borderRadius: 3
+      }))
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{font:{size:10}}}},
+      scales: { x:{stacked:true}, y:{stacked:true} } }
+  });
+
+  // Table
+  const tbody  = document.getElementById('sales-tbody');
+  const tfoot  = document.getElementById('sales-tfoot');
+  const totalRev = sorted.reduce((s,r) => s+r.revenue, 0);
+  tbody.innerHTML = sorted.map(r => `<tr>
+    <td style="font-weight:500">${r.ref}</td>
+    <td class="mono">${Math.round(r.qty).toLocaleString()}</td>
+    <td class="mono">${ksh(r.revenue)}</td>
+    <td class="mono">${r.avgPrice > 0 ? ksh(r.avgPrice) : '—'}</td>
+    <td class="mono">${r.avgMonthly.toFixed(1)}/mo</td>
+  </tr>`).join('');
+  tfoot.textContent = sorted.length + ' products · Total revenue: ' + ksh(totalRev) + ' (' + months.length + ' months)';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MARGINS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderMargins(p) {
+  p = p || _payload; if (!p) return;
+
+  const boms     = p.boms || {};
+  const rawStock = p.rawStock || {};
+  const prices   = p.sellingPrices || {};
+
+  // Compute BoM cost per SKU
+  const rows = [];
+  Object.entries(boms).forEach(([ref, lines]) => {
+    const price = prices[ref] || 0;
+    let bomCost = 0, missingCost = false;
+    lines.filter(l => l.isKg).forEach(l => {
+      const rm = rawStock[l.compLower] || rawStock[l.comp] || null;
+      if (rm && rm.cost > 0) bomCost += l.qty * rm.cost;
+      else missingCost = true;
+    });
+    const margin = price > 0 && bomCost > 0 ? (price - bomCost) / price * 100 : null;
+    rows.push({ ref, price, bomCost, margin, missingCost });
+  });
+  rows.sort((a,b) => (a.margin||999) - (b.margin||999));
+
+  // Alerts
+  const alertEl = document.getElementById('margin-alerts');
+  const below = rows.filter(r => r.margin !== null && r.margin < 0);
+  const zeroCost = rows.filter(r => r.bomCost === 0);
+  let alertHtml = '';
+  if (below.length) alertHtml += below.map(r => `<div class="alert-item critical">🔴 <b>${r.ref}</b> selling below cost — price Ksh ${Math.round(r.price)} vs cost Ksh ${Math.round(r.bomCost)} (${r.margin.toFixed(1)}% margin)</div>`).join('');
+  if (zeroCost.length) alertHtml += `<div class="alert-item low">⚠️ ${zeroCost.length} SKU(s) have zero BoM cost — set standard_price on raw materials in Odoo for accurate margins: ${zeroCost.map(r=>r.ref).join(', ')}</div>`;
+  alertEl.innerHTML = alertHtml || '<div style="color:var(--ok-txt);font-size:11px">✅ No margin alerts</div>';
+
+  // Table
+  const tbody = document.getElementById('margin-tbody');
+  tbody.innerHTML = rows.map(r => {
+    const mcls = r.margin === null ? 'grey' : r.margin < 0 ? 'critical' : r.margin < 20 ? 'low' : 'ok';
+    const mstr = r.margin !== null ? r.margin.toFixed(1) + '%' : '—';
+    return `<tr>
+      <td style="font-weight:500">${r.ref}</td>
+      <td class="mono">${r.price > 0 ? ksh(r.price) : '—'}</td>
+      <td class="mono">${r.bomCost > 0 ? ksh(r.bomCost) : r.missingCost ? '<span style="color:var(--text3)">Incomplete</span>' : '—'}</td>
+      <td class="mono">${r.margin !== null ? ksh(r.price - r.bomCost) : '—'}</td>
+      <td class="mono" style="font-weight:600;color:${r.margin===null?'var(--text3)':r.margin<0?'var(--crit-txt)':r.margin<20?'var(--low-txt)':'var(--green)'}">${mstr}</td>
+      <td><span class="badge ${mcls}">${r.margin===null?'No cost data':r.margin<0?'Below cost':r.margin<20?'Low margin':'OK'}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Bar chart
+  const chartRows = rows.filter(r => r.margin !== null).slice(0, 12);
+  makeChart('chart-margins', {
+    type: 'bar',
+    data: {
+      labels: chartRows.map(r => r.ref),
+      datasets: [{
+        label: 'Margin %',
+        data: chartRows.map(r => r.margin),
+        backgroundColor: chartRows.map(r => r.margin < 0 ? '#c0341dcc' : r.margin < 20 ? '#d4860ecc' : '#2B7A42cc'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FARMER PROCUREMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderFarmers(p) {
+  p = p || _payload; if (!p) return;
+
+  const payables = p.payables || [];
+  const history  = p.purchaseHistory || {};
+
+  // Farmer payables (all payables — in Dashcrop context most are farmers/suppliers)
+  const farmerPay = payables;
+  const totalFarmerPay = farmerPay.reduce((s,r) => s+r.amount, 0);
+  const overdueFarmerPay = farmerPay.filter(r=>r.overdue).reduce((s,r)=>s+r.amount, 0);
+  const farmerCount = new Set(Object.values(history).flatMap(recs => recs.map(r=>r.partner)).filter(Boolean)).size;
+
+  // Average cost from purchase history
+  const allPrices = Object.values(history).flatMap(recs => recs.map(r=>r.unitPrice)).filter(v=>v>0);
+  const avgCost = allPrices.length ? allPrices.reduce((s,v)=>s+v,0)/allPrices.length : 0;
+
+  document.getElementById('m-farmer-payable').textContent  = ksh(totalFarmerPay);
+  document.getElementById('m-farmer-overdue').textContent  = ksh(overdueFarmerPay);
+  document.getElementById('m-farmer-count').textContent    = farmerCount || '—';
+  document.getElementById('m-farmer-cost').textContent     = avgCost > 0 ? ksh(avgCost) : '—';
+
+  // Payables table
+  const payTbody = document.getElementById('farmer-payables-tbody');
+  payTbody.innerHTML = farmerPay.slice(0,10).map(r => `<tr>
+    <td style="font-weight:500">${r.partner}</td>
+    <td class="mono">${ksh(r.amount)}</td>
+    <td style="font-size:11px">${fmtDate(r.dueDate)}</td>
+    <td><span class="badge ${r.overdue?'critical':'grey'}">${r.overdue?'Overdue':'Pending'}</span></td>
+  </tr>`).join('') || '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text3)">No open payables</td></tr>';
+
+  // Purchase history table
+  const histTbody = document.getElementById('farmer-history-tbody');
+  const histRows  = [];
+  Object.entries(history).forEach(([prod, recs]) => {
+    recs.forEach(r => histRows.push({ product: prod, ...r }));
+  });
+  histRows.sort((a,b) => b.date.localeCompare(a.date));
+  histTbody.innerHTML = histRows.slice(0,15).map(r => `<tr>
+    <td style="font-weight:500;font-size:11px">${r.product}</td>
+    <td style="font-size:11px;color:var(--text2)">${r.partner || '—'}</td>
+    <td class="mono">${r.qty ? Math.round(r.qty).toLocaleString() + ' ' + (r.uom||'kg') : '—'}</td>
+    <td class="mono">${r.unitPrice > 0 ? ksh(r.unitPrice) : '—'}</td>
+    <td style="font-size:10px;color:var(--text3)">${r.poRef}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text3)">No purchase history</td></tr>';
+
+  // RM cost chart
+  const topProds = Object.entries(history)
+    .map(([k,recs]) => ({ name: k, price: recs[0]?.unitPrice || 0 }))
+    .filter(r => r.price > 0).sort((a,b) => b.price-a.price).slice(0,8);
+  makeChart('chart-rm-cost', {
+    type: 'bar',
+    data: {
+      labels: topProds.map(r => r.name.substring(0,25)),
+      datasets: [{ label: 'Last PO Price (Ksh/kg)', data: topProds.map(r=>r.price),
+        backgroundColor: '#2B7A42aa', borderRadius: 4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>ksh(v)}}} }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STOCK
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderStock(p) {
+  p = p || _payload; if (!p) return;
+
+  const sh = p.stockHealth || [];
+  const crit = sh.filter(s=>s.status==='critical').length;
+  const low  = sh.filter(s=>s.status==='low').length;
+  const btCounts = {};
+  sh.forEach(s => { if(s.bottleneck) btCounts[s.bottleneck]=(btCounts[s.bottleneck]||0)+1; });
+  const topBt = Object.entries(btCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('sh-crit').textContent     = crit;
+  document.getElementById('sh-low').textContent      = low;
+  document.getElementById('sh-total').textContent    = sh.length;
+  document.getElementById('sh-bottleneck').textContent = topBt ? topBt[0].substring(0,20) : '—';
+
+  // FG stock health table
+  const tbody = document.getElementById('sh-tbody');
+  tbody.innerHTML = sh.length
+    ? sh.map(s => {
+        const covDays = s.runOutDate
+          ? Math.max(0, Math.round((new Date(s.runOutDate)-new Date())/864e5)) : null;
+        const pct = covDays !== null ? Math.min(covDays/90, 1)*100 : 0;
+        const color = s.status==='critical'?'#c0341d':s.status==='low'?'#d4860e':'#2B7A42';
+        return `<tr>
+          <td style="font-weight:500">${s.name || s.ref}<div style="font-size:9px;color:var(--text3)">${s.ref}</div></td>
+          <td class="mono">${Math.round(s.unitsOnShelf||0).toLocaleString()}</td>
+          <td class="mono">${s.salesRate30d ? s.salesRate30d.toFixed(1)+'/mo' : '—'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="covbar-bg"><div class="covbar-fill" style="width:${pct}%;background:${color}"></div></div>
+              <span style="font-size:10px;font-weight:600;color:${color}">${covDays!==null?covDays+'d':'—'}</span>
+            </div>
+          </td>
+          <td style="font-size:11px">${fmtDate(s.runOutDate)}</td>
+          <td class="mono">${s.producibleUnits !== null ? s.producibleUnits.toLocaleString() : '—'}</td>
+          <td style="font-size:10px;color:var(--text2)">${s.bottleneck || '—'}</td>
+          <td style="text-align:center"><span class="badge ${s.status}">${s.status==='critical'?'Critical':s.status==='low'?'Low':'OK'}</span></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text3)">No FG stock data — check Odoo connection and BoMs</td></tr>';
+
+  document.getElementById('sh-tfoot').textContent = sh.length + ' SKUs tracked · ' + crit + ' critical · ' + low + ' low';
+
+  // Raw materials table
+  const rawStock = p.rawStock || {};
+  const rmRows   = Object.values(rawStock).filter((v,i,arr) => arr.findIndex(x=>x.name===v.name)===i)
+                   .sort((a,b) => (b.available||0)-(a.available||0));
+  const rmTbody = document.getElementById('rm-tbody');
+  rmTbody.innerHTML = rmRows.slice(0,20).map(r => `<tr>
+    <td style="font-weight:500">${r.name}</td>
+    <td class="mono">${(r.available||0).toFixed(1)} kg</td>
+    <td class="mono">${r.cost > 0 ? ksh(r.cost) : '—'}</td>
+    <td class="mono">${r.cost > 0 && r.available > 0 ? ksh(r.cost * r.available) : '—'}</td>
+    <td style="font-size:10px;color:var(--text3)">${r.ref || '—'}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--text3)">No raw material stock data</td></tr>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROCUREMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderProcurement(p) {
+  p = p || _payload; if (!p) return;
+
+  // Incoming receipts
+  const pending = p.pendingReceipts || {};
+  const incomingTbody = document.getElementById('incoming-tbody');
+  const incomingEntries = Object.entries(pending).sort((a,b) => {
+    const da = a[1].scheduledDate||'9999', db = b[1].scheduledDate||'9999';
+    return da.localeCompare(db);
+  });
+  incomingTbody.innerHTML = incomingEntries.length
+    ? incomingEntries.map(([supplier, data]) => {
+        const isOverdue = data.scheduledDate && new Date(data.scheduledDate) < new Date();
+        const prods = (data.products||[]).slice(0,3).map(p=>p.name.replace(/^\[[^\]]+\]\s*/,'')).join(', ');
+        return `<tr>
+          <td style="font-weight:500">${supplier}</td>
+          <td style="font-size:10px;color:var(--text2)">${prods || '—'}</td>
+          <td style="font-size:11px">${fmtDate(data.scheduledDate)}</td>
+          <td><span class="badge ${isOverdue?'critical':'low'}">${isOverdue?'Overdue':'In transit'}</span></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text3)">No pending receipts in Odoo</td></tr>';
+
+  // Purchase history
+  const history = p.purchaseHistory || {};
+  const phTbody = document.getElementById('ph-tbody');
+  const phRows  = Object.entries(history).sort((a,b) => a[0].localeCompare(b[0]));
+  phTbody.innerHTML = phRows.map(([prod, recs]) => {
+    const r0 = recs[0]||{}, r1 = recs[1]||{}, r2 = recs[2]||{};
+    return `<tr>
+      <td style="font-weight:500;font-size:11px">${prod}</td>
+      <td class="mono">${r0.unitPrice>0?ksh(r0.unitPrice):'—'}</td>
+      <td class="mono" style="color:var(--text3)">${r1.unitPrice>0?ksh(r1.unitPrice):'—'}</td>
+      <td class="mono" style="color:var(--text3)">${r2.unitPrice>0?ksh(r2.unitPrice):'—'}</td>
+      <td style="font-size:10px;color:var(--text3)">${r0.date||'—'}</td>
+      <td style="font-size:10px;color:var(--text2)">${r0.partner||'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="padding:12px;text-align:center;color:var(--text3)">No purchase history</td></tr>';
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>
